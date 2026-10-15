@@ -1,0 +1,35 @@
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Environment & Secrets (STRICTLY EXCLUDED)
+.env
+.env.neon
+.env.*
+!.env.example
+!.env.neon.example
+!.env.*.example
+
+# Database & Runtime Data
+docker/postgres/data/
+*.log
+
+# IDE & OS Artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+scratch/

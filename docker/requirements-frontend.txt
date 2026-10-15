@@ -1,0 +1,5 @@
+# Frontend dependencies for Streamlit Analytics Copilot
+streamlit>=1.40.0
+plotly>=5.24.0
+pandas>=2.2.0
+httpx>=0.27.0

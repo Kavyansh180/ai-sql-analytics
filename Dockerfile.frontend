@@ -1,0 +1,52 @@
+# Multi-stage production Dockerfile for Streamlit Analytics Copilot Frontend
+
+# ------------------------------------------------------------------------------
+# Stage 1: Builder
+# ------------------------------------------------------------------------------
+FROM python:3.13-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY docker/requirements-frontend.txt ./requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# ------------------------------------------------------------------------------
+# Stage 2: Runtime (non-root)
+# ------------------------------------------------------------------------------
+FROM python:3.13-slim AS runtime
+
+RUN groupadd -g 10001 appgroup && \
+    useradd -u 10001 -g appgroup -s /sbin/nologin -M appuser
+
+WORKDIR /app
+
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Copy frontend source files
+COPY src/frontend /app/src/frontend
+COPY src/__init__.py /app/src/__init__.py
+
+RUN chown -R appuser:appgroup /app
+
+USER appuser
+
+EXPOSE 8501
+
+# Default backend URL (overridable via container environment variable)
+ENV API_BASE_URL="http://localhost:8000"
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health').read()" || exit 1
+
+CMD ["streamlit", "run", "src/frontend/app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]

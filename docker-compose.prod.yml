@@ -1,0 +1,74 @@
+# Production Docker Compose for AI SQL Analytics Copilot
+# Isolates PostgreSQL to internal network (no exposed host port) and runs API container non-root.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sql_analytics_postgres_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sql_analytics_db}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      APP_DB_USER: ${APP_DB_USER:-app_user}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-analytics_user}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD}
+      ANALYTICS_STATEMENT_TIMEOUT_MS: ${ANALYTICS_STATEMENT_TIMEOUT_MS:-3000}
+    # Security: No ports exposed to host machine in production
+    volumes:
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sql_analytics_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend_net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sql_analytics_api_prod
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      ENVIRONMENT: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-sql_analytics_db}
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      APP_DB_USER: ${APP_DB_USER:-app_user}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:-analytics_user}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD}
+      ANALYTICS_STATEMENT_TIMEOUT_MS: ${ANALYTICS_STATEMENT_TIMEOUT_MS:-3000}
+      MAX_QUERY_ROW_LIMIT: ${MAX_QUERY_ROW_LIMIT:-1000}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      LLM_REQUEST_TIMEOUT_SECONDS: ${LLM_REQUEST_TIMEOUT_SECONDS:-30}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-60}
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-65536}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend_net
+
+networks:
+  backend_net:
+    name: sql_analytics_backend_net
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: sql_analytics_postgres_data

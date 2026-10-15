@@ -1,0 +1,14 @@
+# Production FastAPI Backend Dependencies (excluding local dev frontend & test tools)
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.1
+sqlalchemy>=2.0.35
+psycopg[binary]>=3.2.0
+alembic>=1.13.0
+sqlglot>=25.20.0
+google-genai>=2.30.0
+httpx>=0.27.0
+mangum>=0.19.0
+boto3>=1.35.0

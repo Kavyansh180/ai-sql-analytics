@@ -1,0 +1,22 @@
+# AWS Lambda Container Image for AI SQL Analytics Copilot Backend
+FROM public.ecr.aws/lambda/python:3.13
+
+# Install system dependencies (libpq for psycopg if needed, though psycopg-binary is included)
+# Python 3.13 Lambda base image includes minimal Amazon Linux 2023 environment
+
+# Copy minimal backend dependencies (including mangum)
+COPY docker/requirements-api.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+
+# Install dependencies into the Lambda task root
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
+
+# Copy application source code and migration config
+COPY src ${LAMBDA_TASK_ROOT}/src
+COPY alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
+
+# Set environment defaults for serverless execution
+ENV ENVIRONMENT="production"
+ENV DB_SERVERLESS_MODE="true"
+
+# Handler format: <module_path>.<handler_object>
+CMD [ "src.api.handler.handler" ]
