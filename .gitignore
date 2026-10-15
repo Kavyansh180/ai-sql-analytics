@@ -33,3 +33,5 @@ docker/postgres/data/
 .DS_Store
 Thumbs.db
 scratch/
+.copilot_secret
+*.secret
