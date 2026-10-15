@@ -253,6 +253,18 @@ def test_client_health_check_failure():
     assert "unreachable" in health["error"]
 
 
+def test_client_health_check_cold_start_timeout():
+    """Client check_health returns warming when /health times out during cold start."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("Read timed out during container spin up")
+
+    transport = httpx.MockTransport(handler)
+    client = AnalyticsClient(transport=transport)
+    health = client.check_health(timeout_seconds=5.0)
+    assert health["status"] == "warming"
+    assert "warming up" in health["error"]
+
+
 def test_client_sends_copilot_secret_header():
     """Client automatically attaches X-Copilot-Secret header to outgoing requests."""
     captured_headers = {}

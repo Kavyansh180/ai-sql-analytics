@@ -757,13 +757,35 @@ def render_sidebar(client: AnalyticsClient):
         st.markdown("### ⚙️ System Status")
 
         health = client.check_health()
-        if health.get("status") == "healthy":
-            st.success(f"🟢 **Backend Online**\n\n`{client.base_url}`")
+        status = health.get("status")
+        is_cloud_backend = (
+            "lambda-url" in client.base_url
+            or "amazonaws.com" in client.base_url
+            or client.base_url.startswith("https://")
+        )
+
+        if status == "healthy":
+            version_str = f" (v{health.get('version')})" if health.get("version") else ""
+            st.success(f"🟢 **Backend Online{version_str}**\n\n`{client.base_url}`")
+        elif status == "warming":
+            st.warning(
+                "🟡 **Backend Warming Up...**\n\n"
+                "AWS Lambda is completing a cold start. Initialization usually completes in 10–15 seconds."
+            )
+            if st.button("🔄 Refresh Status", key="btn_refresh_warming", use_container_width=True):
+                st.rerun()
         else:
             st.error(f"🔴 **Backend Offline**\n\n`{client.base_url}`")
-            st.caption(
-                "Start backend with: `.\\.venv\\Scripts\\python.exe -m uvicorn src.api.main:app --port 8000`"
-            )
+            if is_cloud_backend:
+                st.caption(
+                    "Cloud endpoint did not respond. If the serverless container was sleeping, click Retry to warm it."
+                )
+                if st.button("🔄 Retry Connection", key="btn_retry_conn", use_container_width=True):
+                    st.rerun()
+            else:
+                st.caption(
+                    "Start backend with: `.\\.venv\\Scripts\\python.exe -m uvicorn src.api.main:app --port 8000`"
+                )
 
         st.markdown("---")
         st.markdown("### 📊 Analytics Schema")
@@ -1117,7 +1139,7 @@ def render_copilot_panel(client: AnalyticsClient):
         ):
             pass
         else:
-            with st.spinner("Analyzing question, generating secure SQL, and querying database..."):
+            with st.spinner("Analyzing question, generating secure SQL, and querying database... (May take ~10–15s if serverless backend is warming)"):
                 now_str = datetime.now().strftime("%H:%M")
                 try:
                     result = client.query(cleaned_question, force=True)

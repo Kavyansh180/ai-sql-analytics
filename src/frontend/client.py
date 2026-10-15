@@ -89,20 +89,30 @@ class AnalyticsClient:
             headers["X-Copilot-Secret"] = self.api_secret
         return headers
 
-    def check_health(self) -> Dict[str, Any]:
+    def check_health(self, timeout_seconds: float = 15.0) -> Dict[str, Any]:
         """
         Verify backend connectivity via GET /health.
         
+        Args:
+            timeout_seconds: Maximum wait time for health check. Defaults to 15.0s
+                             to accommodate serverless cold starts.
+                             
         Returns:
-            Dict containing backend status and version, or unhealthy indicator.
+            Dict containing backend status and version, warming indicator, or unhealthy indicator.
         """
         url = f"{self.base_url}/health"
         headers = self._build_headers()
         try:
-            with httpx.Client(transport=self.transport, timeout=5.0) as client:
+            with httpx.Client(transport=self.transport, timeout=timeout_seconds) as client:
                 resp = client.get(url, headers=headers)
                 resp.raise_for_status()
                 return resp.json()
+        except httpx.TimeoutException:
+            logger.warning("Health check timed out for %s (cold start in progress)", url)
+            return {
+                "status": "warming",
+                "error": "Serverless backend is warming up (cold start in progress). Please wait a moment.",
+            }
         except Exception as err:
             logger.warning("Health check failed for %s: %s", url, type(err).__name__)
             return {"status": "unhealthy", "error": "Backend service unreachable."}
@@ -144,7 +154,8 @@ class AnalyticsClient:
         except httpx.TimeoutException:
             raise AnalyticsAPIError(
                 f"The analytics backend did not respond within {int(self.timeout_seconds)} seconds. "
-                "The query or LLM provider timed out."
+                "If the serverless backend was idle, cold start initialization may have taken longer than expected. "
+                "Please retry your question now."
             )
         except httpx.RequestError as req_err:
             raise AnalyticsAPIError(
